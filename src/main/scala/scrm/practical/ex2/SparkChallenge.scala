@@ -5,7 +5,7 @@ import org.apache.spark.sql.functions._
 
 object SparkChallenge {
 
-  def transformation(input: DataFrame)(implicit spark: SparkSession): (Dataset[Row], Array[Row]) = {
+  def transformation(input: DataFrame)(implicit spark: SparkSession) = {
     import spark.implicits._
     val frame1DF = input
       .withColumn("action_n", lit(1))
@@ -22,10 +22,13 @@ object SparkChallenge {
     val frame1To10DF = frame1DF
       .groupBy(window($"window.start", "10 minutes"))
       .agg(
-        avg("open_1").as("open_10_avg"),
-        avg("close_1").as("close_10_avg"),
+        avg("open_1").as("open_avg"),
+        avg("close_1").as("close_avg"),
       )
       .orderBy("window")
+      .withColumn("start", $"window.start")
+      .withColumn("end", $"window.end")
+      .select("start","end", "open_avg", "close_avg")
 
     val top10Records = input
       .withColumn("action_n", lit(1))
@@ -34,9 +37,11 @@ object SparkChallenge {
       .agg(
         sum($"action_n")
       )
-      .select("window","Open")
+      .select("window.start", "window.end","Open")
       .orderBy(desc_nulls_last("Open"))
       .head(10)
+      .map(row => (row.getTimestamp(0),row.getTimestamp(1), row.getLong(2)))
+
 
     (frame1To10DF, top10Records)
   }
